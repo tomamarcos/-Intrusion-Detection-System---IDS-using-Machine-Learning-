@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetRadar Dashboard - Real-Time Network Security Monitoring</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Navbar */
+        .navbar {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .navbar-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo .shield {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .logo h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #00d4ff, #ffffff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            border-radius: 20px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff00;
+            border-radius: 50%;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--card-accent);
+        }
+
+        .summary-card.total { --card-accent: linear-gradient(90deg, #00d4ff, #0099cc); }
+        .summary-card.attacks { --card-accent: linear-gradient(90deg, #ff4757, #ff3838); }
+        .summary-card.possible { --card-accent: linear-gradient(90deg, #ffa502, #ff8c00); }
+        .summary-card.normal { --card-accent: linear-gradient(90deg, #2ed573, #20bf6b); }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: 0.9rem;
+            color: #a0a0a0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .card-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(45deg, #ffffff, #e0e0e0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .card-change {
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .card-change.positive { color: #2ed573; }
+        .card-change.negative { color: #ff4757; }
+
+        /* Charts Section */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            height: 400px;
+        }
+
+        .chart-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        /* Controls Section */
+        .controls-section {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .search-box, .filter-select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: #ffffff;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .search-box:focus, .filter-select:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+        }
+
+        .search-box::placeholder {
+            color: #a0a0a0;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            color: #ffffff;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.85rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        /* Alerts Table */
+        .alerts-section {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        .section-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .refresh-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: #ffffff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.8rem;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.05);
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-normal {
+            background: rgba(46, 213, 115, 0.2);
+            color: #2ed573;
+            border: 1px solid rgba(46, 213, 115, 0.3);
+        }
+
+        .status-attack {
+            background: rgba(255, 71, 87, 0.2);
+            color: #ff4757;
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            animation: statusPulse 2s infinite;
+        }
+
+        .status-possible {
+            background: rgba(255, 165, 2, 0.2);
+            color: #ffa502;
+            border: 1px solid rgba(255, 165, 2, 0.3);
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(255, 71, 87, 0); }
+        }
+
+        /* Loading Spinner */
+        .loading-spinner {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            background: linear-gradient(45deg, #ff4757, #ff3838);
+            color: #ffffff;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(255, 71, 87, 0.3);
+            transform: translateX(400px);
+            transition: transform 0.5s ease;
+            z-index: 10000;
+            max-width: 300px;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .notification-message {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        /* Footer */
+        .footer {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            text-align: center;
+            margin-top: 3rem;
+        }
+
+        .footer-content {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .footer h3 {
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #00d4ff, #ffffff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .footer p {
+            color: #a0a0a0;
+            line-height: 1.6;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .navbar {
+                padding: 1rem;
+            }
+
+            .logo h1 {
+                font-size: 1.4rem;
+            }
+
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 0.8rem;
+            }
+
+            th, td {
+                padding: 0.75rem 0.5rem;
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="logo">
+                <div class="shield">🛡️</div>
+                <h1>NetRadar Dashboard</h1>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span>Real-time Monitoring</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Summary Cards -->
+        <div class="summary-grid">
+            <div class="summary-card total">
+                <div class="card-header">
+                    <div class="card-title">Total Flows</div>
+                    <div class="card-icon" style="background: rgba(0, 212, 255, 0.2);">📊</div>
+                </div>
+                <div class="card-value" id="totalFlows">0</div>
+                <div class="card-change positive" id="totalChange">+0 new flows</div>
+            </div>
+
+            <div class="summary-card attacks">
+                <div class="card-header">
+                    <div class="card-title">Attacks Detected</div>
+                    <div class="card-icon" style="background: rgba(255, 71, 87, 0.2);">🚨</div>
+                </div>
+                <div class="card-value" id="attackCount">0</div>
+                <div class="card-change negative" id="attackChange">+0 attacks</div>
+            </div>
+
+            <div class="summary-card possible">
+                <div class="card-header">
+                    <div class="card-title">Possible Attacks</div>
+                    <div class="card-icon" style="background: rgba(255, 165, 2, 0.2);">⚠️</div>
+                </div>
+                <div class="card-value" id="possibleCount">0</div>
+                <div class="card-change" id="possibleChange">+0 possible</div>
+            </div>
+
+            <div class="summary-card normal">
+                <div class="card-header">
+                    <div class="card-title">Normal Traffic</div>
+                    <div class="card-icon" style="background: rgba(46, 213, 115, 0.2);">✅</div>
+                </div>
+                <div class="card-value" id="normalCount">0</div>
+                <div class="card-change positive" id="normalChange">+0 normal</div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-grid">
+            <div class="chart-container">
+                <div class="chart-title">Traffic Distribution</div>
+                <canvas id="pieChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <div class="chart-title">Attacks Over Time</div>
+                <canvas id="lineChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Controls Section -->
+        <div class="controls-section">
+            <div class="controls-grid">
+                <input type="text" class="search-box" id="searchBox" placeholder="Search by IP address...">
+                <select class="filter-select" id="filterSelect">
+                    <option value="">All Results</option>
+                    <option value="ATTACK">Attacks Only</option>
+                    <option value="POSSIBLE ATTACK">Possible Attacks</option>
+                    <option value="NORMAL">Normal Traffic</option>
+                </select>
+                <button class="btn" onclick="exportToCSV()">📥 Export CSV</button>
+                <button class="btn" onclick="clearAlerts()">🗑️ Clear Alerts</button>
+            </div>
+        </div>
+
+        <!-- Alerts Table -->
+        <div class="alerts-section">
+            <div class="section-header">
+                <div class="section-title">Real-Time Security Alerts</div>
+                <button class="refresh-btn" onclick="fetchAlerts()">🔄 Refresh</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Source IP</th>
+                            <th>Destination IP</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alertsTableBody">
+                        <!-- Dynamic content will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <h3>University IDS Graduation Project</h3>
+            <p>Developed by the Cybersecurity & Network Security Team<br>
+            Front-End Development by <strong>Your Name</strong> | Real-time Network Intrusion Detection System</p>
+        </div>
+    </footer>
+
+    <!-- Loading Spinner -->
+    <div class="loading-spinner" id="loadingSpinner">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification">
+        <div class="notification-title">🚨 Security Alert!</div>
+        <div class="notification-message">New attack detected in your network</div>
+    </div>
+
+    <script>
+        // Global variables
+        let allAlerts = [];
+        let filteredAlerts = [];
+        let pieChart, lineChart;
+        let lastAlertCount = 0;
+        let attackTimeline = [];
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCharts();
+            fetchAlerts();
+            setupEventListeners();
+            
+            // Auto-refresh every 2 seconds
+            setInterval(() => {
+                fetchAlerts();
+            }, 2000);
+        });
+
+        // Setup event listeners
+        function setupEventListeners() {
+            document.getElementById('searchBox').addEventListener('input', filterAlerts);
+            document.getElementById('filterSelect').addEventListener('change', filterAlerts);
+        }
+
+        // Show loading spinner
+        function showLoading() {
+            document.getElementById('loadingSpinner').style.display = 'block';
+        }
+
+        // Hide loading spinner
+        function hideLoading() {
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+
+        // Fetch alerts from Flask API
+        async function fetchAlerts() {
+            try {
+                showLoading();
+                const response = await fetch('/alerts');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const alerts = await response.json();
+                
+                // Check for new attacks and show notification
+                const currentAttackCount = alerts.filter(alert => alert.result === 'ATTACK').length;
+                if (currentAttackCount > lastAlertCount && lastAlertCount > 0) {
+                    showNotification();
+                    playNotificationSound();
+                }
+                lastAlertCount = currentAttackCount;
+                
+                allAlerts = alerts;
+                updateSummaryCards();
+                updateCharts();
+                filterAlerts();
+                
+            } catch (error) {
+                console.error('Error fetching alerts:', error);
+                // Show error in console but don't break the UI
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Update summary cards
+        function updateSummaryCards() {
+            const totalFlows = allAlerts.length;
+            const attacks = allAlerts.filter(alert => alert.result === 'ATTACK').length;
+            const possibleAttacks = allAlerts.filter(alert => alert.result === 'POSSIBLE ATTACK').length;
+            const normal = allAlerts.filter(alert => alert.result === 'NORMAL').length;
+
+            document.getElementById('totalFlows').textContent = totalFlows;
+            document.getElementById('attackCount').textContent = attacks;
+            document.getElementById('possibleCount').textContent = possibleAttacks;
+            document.getElementById('normalCount').textContent = normal;
+
+            // Update change indicators (simplified for demo)
+            document.getElementById('totalChange').textContent = `+${totalFlows} total`;
+            document.getElementById('attackChange').textContent = `+${attacks} attacks`;
+            document.getElementById('possibleChange').textContent = `+${possibleAttacks} possible`;
+            document.getElementById('normalChange').textContent = `+${normal} normal`;
+        }
+
+        // Initialize charts
+        function initializeCharts() {
+            // Pie Chart
+            const pieCtx = document.getElementById('pieChart').getContext('2d');
+            pieChart = new Chart(pieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Normal', 'Attack', 'Possible Attack'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: [
+                            'rgba(46, 213, 115, 0.8)',
+                            'rgba(255, 71, 87, 0.8)',
+                            'rgba(255, 165, 2, 0.8)'
+                        ],
+                        borderColor: [
+                            '#2ed573',
+                            '#ff4757',
+                            '#ffa502'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#ffffff',
+                                padding: 20,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Line Chart
+            const lineCtx = document.getElementById('lineChart').getContext('2d');
+            lineChart = new Chart(lineCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Attacks',
+                        data: [],
+                        borderColor: '#ff4757',
+                        backgroundColor: 'rgba(255, 71, 87, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'Possible Attacks',
+                        data: [],
+                        borderColor: '#ffa502',
+                        backgroundColor: 'rgba(255, 165, 2, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#ffffff'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#a0a0a0'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#a0a0a0'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update charts with new data
+        function updateCharts() {
+            const attacks = allAlerts.filter(alert => alert.result === 'ATTACK').length;
+            const possibleAttacks = allAlerts.filter(alert => alert.result === 'POSSIBLE ATTACK').length;
+            const normal = allAlerts.filter(alert => alert.result === 'NORMAL').length;
+
+            // Update pie chart
+            pieChart.data.datasets[0].data = [normal, attacks, possibleAttacks];
+            pieChart.update();
+
+            // Update line chart with timeline data
+            updateTimelineChart();
+        }
+
+        // Update timeline chart
+        function updateTimelineChart() {
+            const now = new Date();
+            const timeLabels = [];
+            const attackData = [];
+            const possibleData = [];
+
+            // Generate last 10 time points
+            for (let i = 9; i >= 0; i--) {
+                const time = new Date(now.getTime() - i * 30000); // 30 second intervals
+                timeLabels.push(time.toLocaleTimeString());
+                
+                // Count attacks in this time window
+                const windowStart = time.getTime() - 30000;
+                const windowEnd = time.getTime();
+                
+                const windowAttacks = allAlerts.filter(alert => {
+                    const alertTime = new Date(alert.timestamp).getTime();
+                    return alertTime >= windowStart && alertTime <= windowEnd && alert.result === 'ATTACK';
+                }).length;
+                
+                const windowPossible = allAlerts.filter(alert => {
+                    const alertTime = new Date(alert.timestamp).getTime();
+                    return alertTime >= windowStart && alertTime <= windowEnd && alert.result === 'POSSIBLE ATTACK';
+                }).length;
+                
+                attackData.push(windowAttacks);
+                possibleData.push(windowPossible);
+            }
+
+            lineChart.data.labels = timeLabels;
+            lineChart.data.datasets[0].data = attackData;
+            lineChart.data.datasets[1].data = possibleData;
+            lineChart.update();
+        }
+
+        // Filter alerts based on search and filter criteria
+        function filterAlerts() {
+            const searchTerm = document.getElementById('searchBox').value.toLowerCase();
+            const filterType = document.getElementById('filterSelect').value;
+
+            filteredAlerts = allAlerts.filter(alert => {
+                const matchesSearch = !searchTerm || 
+                    alert.src_ip.toLowerCase().includes(searchTerm) ||
+                    alert.dst_ip.toLowerCase().includes(searchTerm);
+                
+                const matchesFilter = !filterType || alert.result === filterType;
+                
+                return matchesSearch && matchesFilter;
+            });
+
+            updateAlertsTable();
+        }
+
+                // Update alerts table
+        function updateAlertsTable() {
+            const tbody = document.getElementById('alertsTableBody');
+            tbody.innerHTML = '';
+
+            if (filteredAlerts.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 2rem; color: #a0a0a0;">
+                            No alerts found matching your criteria
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            // Sort by timestamp (newest first)
+            const sortedAlerts = [...filteredAlerts].sort((a, b) => 
+                new Date(b.timestamp) - new Date(a.timestamp)
+            );
+
+            // Loop through sorted alerts and append to table
+            sortedAlerts.forEach(alert => {
+                const statusClass = alert.result === 'ATTACK'
+                    ? 'status-attack'
+                    : alert.result === 'POSSIBLE ATTACK'
+                        ? 'status-possible'
+                        : 'status-normal';
+
+                const row = `
+                    <tr>
+                        <td>${new Date(alert.timestamp).toLocaleString()}</td>
+                        <td>${alert.src_ip}</td>
+                        <td>${alert.dst_ip}</td>
+                        <td><span class="status-badge ${statusClass}">${alert.result}</span></td>
+                    </tr>
+                `;
+
+                tbody.insertAdjacentHTML('beforeend', row);
+            });
+        }
+
+        // Show notification for new attack
+        function showNotification() {
+            const notification = document.getElementById('notification');
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 4000);
+        }
+
+        // Play notification sound
+        function playNotificationSound() {
+            const audio = new Audio('https://notificationsounds.com/storage/sounds/file-sounds-1154-pristine.mp3');
+            audio.play();
+        }
+
+        // Export alerts to CSV
+        function exportToCSV() {
+            if (allAlerts.length === 0) return;
+
+            let csv = 'Timestamp,Source IP,Destination IP,Result\n';
+            allAlerts.forEach(alert => {
+                csv += `"${alert.timestamp}","${alert.src_ip}","${alert.dst_ip}","${alert.result}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'alerts.csv');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // Clear all alerts
+        function clearAlerts() {
+            allAlerts = [];
+            filteredAlerts = [];
+            updateSummaryCards();
+            updateCharts();
+            updateAlertsTable();
+        }
+    </script>
+</body>
+</html>
