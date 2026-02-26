@@ -37,7 +37,7 @@ Clear Alerts Button: Reset dashboard data
 Technical Architecture
 text
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│  Packet Capture │    │ Feature          │    │ ML Model        │
+│  Packet Capture │     │ Feature          │    │ ML Model        │
 │  (Scapy)        │───▶│ Extraction       │───▶│ Prediction      │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                                                        │
