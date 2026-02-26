@@ -35,17 +35,21 @@ Timeline Chart: Attack frequency over last 10 minutes
 Clear Alerts Button: Reset dashboard data
 
 Technical Architecture
-text
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│  Packet Capture │     │ Feature          │    │ ML Model        │
-│  (Scapy)        │───▶│ Extraction       │───▶│ Prediction      │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                                       │
-                                                       ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│  Flask Dashboard│    │ Alert Generation │    │ Decision Logic  │
-│  (Real-time)    │◀───│ & Storage        │◀───│ & Voting        │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+Packet Capture ──► Feature Extraction ──► ML Prediction
+      (Scapy)                              │
+                                           ▼
+                                  Decision Logic
+                                   & Voting
+                                           │
+                                           ▼
+                              Alert Generation
+                                   & Storage
+                                           │
+                                           ▼
+                              Flask Dashboard
+                                (Real-time)
+
+
 Configuration Parameters
 python
 SAVE_PATH = r"D:\NetRadar\container"        # Output directory
